@@ -1,4 +1,3 @@
-# space-path-planning
 # Space Path Planning
 
 **Path planning algorithms used by Mars rovers, implemented from scratch, explained, and visualized.**
