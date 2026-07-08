@@ -30,7 +30,12 @@ include(GoogleTest)   # provides gtest_discover_tests()
 # Compiled (non-header-only) sources live here. Add future .cpp files to this list.
 add_library(planning
     src/maps/grid.cpp
+    src/maps/search_trace.cpp
 )
+
+# Demo: build a Mars grid, run A*, and write a JSON search trace.
+add_executable(a_star_demo apps/a_star_demo.cpp)
+target_link_libraries(a_star_demo planning)
 
 add_executable(priority_list_test tests/test_priority_list.cpp)
 target_link_libraries(priority_list_test planning gtest gtest_main)

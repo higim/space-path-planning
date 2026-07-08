@@ -3,6 +3,7 @@
 #include <vector>
 #include <functional>
 #include <unordered_map>
+#include <optional>
 #include <limits>
 
 #include "graph.h"
@@ -13,9 +14,11 @@
 template <typename T, typename Map = Graph<T>>
 class AStar : public PathPlanner<T> {
     public:
+        using ExpandCallback = typename PathPlanner<T>::ExpandCallback;
+
         AStar(const Map& g, const T& goal, std::function<int(const T&)> h);
 
-        std::vector<T> plan(const T& current) override;
+        std::vector<T> plan(const T& current, ExpandCallback on_expand = nullptr) override;
 
     private:
         struct NodeInfo {

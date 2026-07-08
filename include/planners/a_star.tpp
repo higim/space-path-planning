@@ -12,7 +12,7 @@ template <typename T, typename Map>
 AStar<T, Map>::AStar(const Map& g, const T& goal, std::function<int(const T&)> h) : graph(g), goal(goal), h(h) {};
 
 template <typename T, typename Map>
-std::vector<T> AStar<T, Map>::plan(const T& start) {
+std::vector<T> AStar<T, Map>::plan(const T& start, ExpandCallback on_expand) {
     openset.insert(start, h(start));   // f(start) = g(0) + h(start)
     map_state[start] = {
         .g_score = 0,
@@ -21,6 +21,16 @@ std::vector<T> AStar<T, Map>::plan(const T& start) {
 
     while (!openset.empty()) {
         T current = openset.pop().value();
+
+        // Trace
+        if (on_expand) {
+            std::vector<std::pair<T, int>> frontier;
+            for (const auto& [node, key] : openset.entries())
+                frontier.push_back({node, key});
+            on_expand(current, map_state[current].g_score,
+                      map_state[current].f_score, frontier);
+        }
+
         if (current == goal) {
             return reconstruct_path(start);
         }

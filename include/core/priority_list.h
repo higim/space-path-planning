@@ -3,6 +3,8 @@
 #include <set>
 #include <unordered_map>
 #include <optional>
+#include <vector>
+#include <utility>
 #include <cstddef>
 #include <concepts>
 
@@ -61,6 +63,17 @@ class PriorityList {
         std::optional<T> top() const {
             if (pq.empty()) return std::nullopt;
             return pq.begin()->second;
+        }
+
+        // A read-only snapshot of every queued entry as {payload, key} pairs,
+        // ordered by key (the underlying set is already sorted). Used to record
+        // the frontier during a traced search.
+        std::vector<std::pair<T, K>> entries() const {
+            std::vector<std::pair<T, K>> out;
+            out.reserve(pq.size());
+            for (const auto& [key, payload] : pq)
+                out.push_back({payload, key});
+            return out;
         }
 
         // Remove and return the minimum's payload.
