@@ -114,6 +114,44 @@ def render_hero(trace, out_path):
     print(f"hero image -> {out_path}")
 
 
+def render_costmap(trace, out_path, annotate_costs=True):
+    """The raw traversability grid: each cell tinted and labelled with its cost.
+
+    No search, no path — just the stage A* performs on. Flat regolith is cheap
+    (dark, low number), rocky terrain is expensive (orange, high number), and
+    obstacles are impassable black cells with no number at all.
+    """
+    meta = trace["meta"]; H, W = meta["height"], meta["width"]
+    costs = trace["grid"]["costs"]
+    base = terrain_rgb(costs, H, W)
+
+    fig, ax = _make_ax(H, W)
+    ax.imshow(base, origin="upper", interpolation="nearest",
+              extent=[0, W, H, 0], zorder=1)
+
+    if annotate_costs:
+        arr = np.array(costs, dtype=float)
+        for r in range(H):
+            for c in range(W):
+                v = arr[r, c]
+                if v >= OBSTACLE_THRESHOLD:
+                    continue
+                # dark text on cheap (light-ish) cells, light text on hot cells
+                shade = MARS["space"] if v >= 4 else MARS["text"]
+                ax.text(c + 0.5, r + 0.5, f"{int(v)}", ha="center", va="center",
+                        color=shade, fontsize=6.5, family="monospace", zorder=3)
+
+    _draw_endpoints(ax, trace)
+    ax.text(0.02, -0.04,
+            "traversability grid  ·  1 = flat regolith  …  5 = rocky  ·  black = impassable",
+            transform=ax.transAxes, color=MARS["text"], fontsize=9,
+            family="monospace", ha="left", va="top")
+    fig.savefig(out_path, dpi=150, bbox_inches="tight",
+                facecolor=MARS["space"], pad_inches=0.15)
+    plt.close(fig)
+    print(f"cost map -> {out_path}")
+
+
 def render_anim(trace, out_path, fps=30, tail=45):
     """Animate the frontier wave, then draw the path.
 
@@ -242,15 +280,18 @@ def main():
     ap.add_argument("trace")
     ap.add_argument("--hero")
     ap.add_argument("--anim")
+    ap.add_argument("--costmap")
     ap.add_argument("--fps", type=int, default=30)
     args = ap.parse_args()
 
     trace = load_trace(args.trace)
     if args.hero:
         render_hero(trace, args.hero)
+    if args.costmap:
+        render_costmap(trace, args.costmap)
     if args.anim:
         render_anim(trace, args.anim, fps=args.fps)
-    if not args.hero and not args.anim:
+    if not args.hero and not args.anim and not args.costmap:
         render_hero(trace, "hero.png")
 
 

@@ -44,6 +44,12 @@ Both of these get distilled into something a computer can plan on: a **grid**. T
 
 This grid, with its per-cell costs, is called a **traversability grid** or a **cost map**, and it is the stage on which every algorithm in this series performs. It's worth pausing on the honesty of this abstraction: the real Martian surface is continuous, messy, and three-dimensional, and we are flattening it into a checkerboard of numbers. Almost everything clever in path planning comes from how well that checkerboard captures reality. We will spend the whole series pushing on that idea. For now, take the grid as given: a field of cells, each with a cost, a starting cell where the rover sits, and a goal cell we want it to reach.
 
+Here is exactly that: an actual cost map, the same one the algorithm will search in a moment. Each cell carries a number — **1** is flat regolith the rover crosses freely, and the cost climbs through **5** for increasingly rocky, expensive ground. The black cells are impassable rock: no number, never entered. The green cell is where the rover starts; the red cell is the goal.
+
+![A traversability grid: each cell tagged with its traversal cost](images/astar_costmap.png)
+
+This is the whole world as A\* sees it. Not mountains and dust and light, just a field of numbers to add up. The art of the rest of this series is in what those numbers fail to capture.
+
 The question A\* answers is deceptively simple to state: **what is the cheapest path across this grid from start to goal?**
 
 ---
