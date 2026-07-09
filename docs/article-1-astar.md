@@ -108,7 +108,7 @@ Second, look at the *shape* of the path. See how it moves only in right angles, 
 ## A little bit of engineering: the pieces you actually build
 
 If you were to implement this yourself (the code for this series is linked at the end) A\* turns out to need surprisingly few moving parts, and they're worth naming because they recur in every algorithm to come.
-
+https://github.com/higim/space-path-planning/tree/main
 You need a **map** that, given a cell, can tell you its traversable neighbours and the cost of stepping to each. Whether that map is a grid laid over Martian terrain or an abstract graph of connected nodes doesn't matter to A\* at all. It only ever asks "what are this cell's neighbours, and what does each step cost?" That clean separation is what lets the same planner drive a warehouse robot and a Mars rover.
 
 You need a **heuristic**: the function that estimates remaining cost and does the aiming. Swap it out and you change the algorithm's whole personality, Manhattan distance for a four-direction grid, zero to fall back to blind Dijkstra.
@@ -123,12 +123,10 @@ That's the whole skeleton: a map that knows its neighbours, a heuristic that aim
 
 A* has a quiet assumption baked into it: that the map doesn't change. It plans across a grid it knows completely, from start to goal, in one shot. But a rover crossing an alien landscape is constantly finding out the map was wrong: a rock it couldn't see from orbit, a patch of sand softer than it looked. Replanning from scratch every time it learns something new would be too slow. The algorithms that came after A* - D*, D* Lite, Field D* - are largely about teaching A*'s core idea to cope with a map that keeps changing underfoot. That's part two.
 
-And the drives from the opening fit here too. Choosing where the waypoints go, reading raw imagery with all the visual detail a cost-grid throws away, is the part the AI took a pass at. Everything downstream, turning those waypoints into safe motion across shifting terrain, is still the job of planners descended from the algorithms in this series. JPL's Vandi Verma describes off-world driving as three pillars: perception (seeing the rocks and ripples), localization (knowing where you are), and planning and control (deciding and executing the path). The AI reached into the first. This series is about the third.
-
 So that's where we start: with A*, the ancestor. Next, we teach it to handle a world that won't hold still.
 
 ---
 
-*Part 2 will cover D\* and D\* Lite: how to replan efficiently when the map changes as you drive. The full implementation — modern C++, tested, with the visualizer that produced the images above — is on GitHub \[link].*
+*Part 2 will cover D\* and D\* Lite: how to replan efficiently when the map changes as you drive. The full implementation — modern C++, tested, with the visualizer that produced the images above — is on ![GitHub](https://github.com/higim/space-path-planning/tree/main).*
 
-*The images in this article were generated from a real A\* search on procedurally generated Mars-like terrain, using the open-source visualizer built for this series.*
+*The images in this article were generated from a real A\* search on procedurally generated Mars-like terrain, using the visualizer built for this series.*
