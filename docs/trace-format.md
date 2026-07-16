@@ -45,10 +45,21 @@ One trace file fully describes a search run, enough to replay it frame by frame.
     ...
     {"row": 2, "col": 17}
   ],
+  "replans": [                           // Part 2+: empty/absent for a one-shot A* run
+    {
+      "origin": {"row": 12, "col": 16},  // where the rover is when it replans
+      "changes": [                       // cells whose cost changed just before this replan
+        {"row": 10, "col": 18, "cost": 1000000}
+      ],
+      "steps": [ /* same shape as top-level steps */ ],
+      "path":  [ /* new path, origin -> goal */ ]
+    }
+    // ... one entry per replan during the drive
+  ],
   "stats": {
-    "expanded_count": 143,
+    "expanded_count": 143,               // initial-phase expansions only
     "path_length": 31,
-    "path_cost": 34
+    "replan_count": 9
   }
 }
 ```
@@ -63,8 +74,13 @@ One trace file fully describes a search run, enough to replay it frame by frame.
   pulse at the leading edge.
 - `path` is the reconstructed optimal path. Present only if the goal was reached;
   omitted or empty if no path exists.
-- For D* Lite later, we add `steps[i].type` ("expand" | "update") and a
-  `replans` array. A* only ever "expands", so the field is omitted here.
+- `replans` (Part 2+) records a sensor-limited drive: the top-level `steps`/`path`
+  are the initial search from the start, then each replan entry is a fresh search
+  from the rover's current cell (`origin`) after the listed `changes` were revealed.
+  A one-shot A* run (Part 1) has an empty `replans`, so the schema is unchanged for
+  it. We only record expansions (one `steps` entry per expanded node); D* Lite's
+  vertex updates and its open set are deliberately not traced — the honest measure
+  of work is the expansion count, and the open set stays large and dormant.
 
 ## Why frontier snapshots per step
 

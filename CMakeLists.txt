@@ -37,6 +37,10 @@ add_library(planning
 add_executable(a_star_demo apps/a_star_demo.cpp)
 target_link_libraries(a_star_demo planning)
 
+# Article 2 demo: robot drives into a revealed wall; A* rescans, D* Lite repairs.
+add_executable(replanning_demo apps/replanning_demo.cpp)
+target_link_libraries(replanning_demo planning)
+
 add_executable(priority_list_test tests/test_priority_list.cpp)
 target_link_libraries(priority_list_test planning gtest gtest_main)
 gtest_discover_tests(priority_list_test)
@@ -48,6 +52,10 @@ gtest_discover_tests(a_star_test)
 add_executable(d_star_test tests/test_d_star.cpp)
 target_link_libraries(d_star_test planning gtest gtest_main)
 gtest_discover_tests(d_star_test)
+
+add_executable(d_lite_test tests/test_d_lite.cpp)
+target_link_libraries(d_lite_test planning gtest gtest_main)
+gtest_discover_tests(d_lite_test)
 
 add_executable(grid_test tests/test_grid.cpp)
 target_link_libraries(grid_test planning gtest gtest_main)
