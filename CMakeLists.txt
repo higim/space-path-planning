@@ -45,6 +45,10 @@ add_executable(a_star_test tests/test_a_star.cpp)
 target_link_libraries(a_star_test planning gtest gtest_main)
 gtest_discover_tests(a_star_test)
 
+add_executable(d_star_test tests/test_d_star.cpp)
+target_link_libraries(d_star_test planning gtest gtest_main)
+gtest_discover_tests(d_star_test)
+
 add_executable(grid_test tests/test_grid.cpp)
 target_link_libraries(grid_test planning gtest gtest_main)
 gtest_discover_tests(grid_test)
