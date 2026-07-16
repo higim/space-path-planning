@@ -1,133 +1,97 @@
-<!--
-  WORKING SKELETON for Part 2. Section headers + intent notes + visualization
-  placeholders. We fill the prose in together. Author notes are in > _italic_
-  callouts and HTML comments; delete them as each section gets written.
-
-  Decisions locked so far:
-   - HONEST FRAMING (from measuring the real code): D* Lite is NOT always fewer
-     expansions than A*. A single big new obstacle is its worst case (raise-heavy).
-     Its win is REUSE that compounds with map size + number of replans. So the
-     realistic Mars scenario -- a rover with a short sensor horizon discovering
-     obstacles as it drives -- is where it shines.
-   - Visuals: two drive GIFs (astar_drive.gif, dlite_drive.gif) + a scaling chart
-     (replan_scaling.png) that carries the quantitative punch. Plus the blocky
-     route hero (dlite_hero.png) -> Field D*.
-   - Obstacles are true impassable rock; both planners use the SAME informed
-     heuristic (A* -> distance-to-goal, D* Lite -> distance-to-robot).
-   - Note for writing: D* Lite's search is goal-anchored, so its per-replan
-     footprint STREAKS along the corridor (fewer cells than A*, but stretched);
-     the honest metric is the running expansion count, not the cloud's area.
--->
-
 # From A* to Anthropic: Nearly 60 Years of Teaching Mars Rovers to Find Their Way
 
-### Part 2 — D\* and D\* Lite: replanning when the map won't hold still
+### Part 2. D\* and D\* Lite: replanning when the map won't hold still
+
+![Same drive, same obstacles: A\* re-explodes its search on every discovery (left), D\* Lite barely reacts (right)](images/hero_replan_compare.png)
 
 ---
 
-<!-- INTRO -->
-> _Intent: pick up Part 1's exact closing thread ("teach it to handle a world
-> that won't hold still"). One or two short paragraphs. A rover crossing an alien
-> landscape is constantly discovering the map was wrong — a rock unseen from
-> orbit, sand softer than it looked. Set up the question: what do you do when the
-> world changes after you've already planned?_
+In part one we met A\*, the algorithm still at the core of how robots plan routes, and watched it sweep across a patch of Mars-like terrain to pick out the cheapest path from start to goal. But there's an assumption built into A* that I flagged at the end: it believes the map. It plans across a grid it knows completely, in one shot, and then it's finished.
 
----
+A rover crossing Mars doesn't get to work that way. Its map is stitched together from orbital photographs, and it's always a little wrong somewhere. A rock the orbiter couldn't resolve. A patch of sand that looked firm and isn't. A slope that turns out steeper up close than it seemed from 300 km up. The rover finds these things out the only way anyone finds out anything on Mars: by driving into the neighbourhood and looking. And each time it learns something new, the path A\* handed it back at the start may no longer hold.
+
+That's the question now: what do you do when the world changes after you've committed to a plan? The obvious first answer is to run the algorithm again, with your current position as the new start. But that costs more than you'd expect, for reasons that have as much to do with the rover's hardware as with the algorithm itself.
 
 ## When the map lies
-<!-- SECTION 1 — the problem, motivate dynamic replanning -->
-> _Intent: A\* planned a clean path across the cost map. The rover drives, and its
-> sensors keep discovering rocks that weren't on the map. Every time one blocks the
-> route, A\*'s only move is to throw everything away and search again from where it
-> stands. Watch the search cloud re-ignite at every discovery — the counter keeps
-> climbing. Land the question: surely we can reuse what we already computed?_
 
-![A rover driving under A*: every newly discovered rock forces a fresh search from scratch](images/astar_drive.gif)
-<!-- Viz 1: A* sensor-limited drive. The counter (ends ~618) is the honest metric. -->
+Picture the rover mid-drive. A\* gave it a clean route to the goal, and it's been rolling along it, ticking off cells one by one. Then the cameras catch something the map didn't have: a boulder, squarely in the path ahead.
 
----
+From that point on, the plan is worthless. The rover has to find another way around, and A\* has exactly one move available: forget everything and search again from where it's standing. It keeps no memory of the work it just did. The frontier it grew so carefully, the hundreds of cells it examined and closed, all of it gets thrown out, and a fresh search inflates from scratch.
 
-## The slowest computer you'll respect
-<!-- SECTION 2 — hardware; this is the STAKES, not a tangent -->
-> _Intent: rover CPUs are slower than a decade-old phone (RAD750, ~200 MHz,
-> PowerPC). Explain WHY, honestly: space radiation causes single-event upsets; a
-> single ionizing particle can flip a bit. Smaller transistors hold less charge
-> per stored bit (lower critical charge), so they flip more easily — which is why
-> rad-hardened chips deliberately use older, larger, slower process nodes. Trade
-> raw speed for not-corrupting-your-state-mid-drive._
->
-> _HINGE SENTENCE (end the section here): on a computer like that, you cannot
-> afford to recompute the whole plan every time the world twitches. You must reuse
-> the work you already did. That single constraint is what the rest of this
-> article is about._
+You can see it in the animation. Every time a rock blocks the route, the search cloud re-ignites around it: a new cone of exploration, from nothing, mostly just to rediscover the path the rover already had.
 
----
+![A rover driving under A\*: every newly discovered rock forces a fresh search from scratch](images/astar_drive.gif)
 
-## D\*: the first to reuse — and why it's hard
-<!-- SECTION 3 — original D* (Stentz 1994), BRIEF -->
-> _Intent: keep it short. D\* (Stentz, 1994) was the first to make A\*'s idea
-> incremental: when an edge cost changes, don't restart — propagate the change
-> outward through the affected nodes. Introduce the notion of an INCONSISTENT node
-> ("something changed here; this node and its neighbours may need to be
-> reconsidered"). Original D\* tracks RAISE and LOWER states as costs rise and fall,
-> and the bookkeeping is famously hard to reason about and to prove correct. That
-> difficulty is the reason a cleaner reformulation came along. The full
-> implementation is linked — this stays high-level._
+It gets the rover there, but it repeats an enormous amount of thinking to do it. Each obstacle triggers a full search, and most of what that search turns up is identical to what the rover knew a second earlier. The terrain didn't change, only one small corner of it did.
+
+So the obvious question is whether we can reuse what we already computed instead of rebuilding the plan from scratch. The answer is yes, and it's the whole point of this article. But first it's worth seeing why the waste hurts so much on Mars specifically, and for that you have to meet the rover's brain.
+
+## A brain from the 1990s
+
+The computer flying Perseverance runs on a chip called the RAD750, clocked at 200 MHz. That rover landed in 2021. It shoots and caches samples for a future return mission, and it carried a helicopter to another planet, all on a processor about as fast as a desktop PC from the late 1990s. It's the same PowerPC 750 Apple put in the 1998 iMac, hardened for space. A modern phone runs circles around it.
+
+That's a deliberate choice, and the reason is radiation.
+
+Out beyond Earth's magnetic field, and on the surface of a Mars that has none of its own, space is full of high-energy particles: cosmic rays from distant supernovae, protons streaming off the Sun. When one of them strikes a microchip it dumps a small packet of charge into the silicon, and in a modern processor that can be enough to flip a bit, turning a 0 into a 1 in the middle of a calculation. It's called a single-event upset. One stray particle, one corrupted number, and the arithmetic steering a two-billion-dollar rover across a crater floor is quietly wrong.
+
+Why are modern chips so vulnerable to this and old ones less so? It comes down to size. As transistors have shrunk, the relentless march that makes each phone faster than the last, each one holds less charge to represent a stored bit. The energy needed to flip that bit keeps dropping, until a cutting-edge transistor stores so few electrons that a single cosmic ray can overwhelm it. An older, larger transistor sits at a higher voltage and shrugs the same particle off. Radiation-hardened chips are built the opposite way to consumer chips on purpose: bigger transistors, older manufacturing, generous margins. They give up raw speed for the more valuable property of not corrupting themselves mid-thought.
+
+Speed isn't the only thing in short supply. Perseverance has no solar panels; it runs off a lump of decaying plutonium that puts out about 110 watts, roughly a household light bulb. Two batteries store that trickle up and hand it back in bursts, because a single science activity can draw 900 watts on its own. Every watt the processor spends thinking is a watt not going to the drill, the heaters that keep the electronics alive through a −80 °C night, or the drive motors. And the working day is short: the rover has a limited window of daylight and warmth to get anything done before it has to hunker down again.
+
+So on a computer this slow, with a power budget this tight and a day this short, you can't throw the plan away and rebuild it from nothing every time a rock surprises you. You repair the plan instead of recomputing it, and that constraint is what the rest of this article is about.
 
 ---
 
-## D\* Lite: the same idea, made sane
-<!-- SECTION 4 — D* Lite (Koenig & Likhachev 2002), high-level; the payoff viz -->
-> _Intent: high-level, three beats._
->
-> _1. THE AHA — search BACKWARD from the goal. The goal never moves; the robot
-> does. Anchor the search at the goal, and when the rover advances or finds a rock,
-> most cost-to-goal values are still valid — only a local patch needs repair._
->
-> _2. THE BOOKKEEPING, gently — every cell keeps two numbers: g (last-known
-> cost-to-goal) and rhs (a one-step lookahead: the best its neighbours currently
-> offer). When they disagree, the cell is inconsistent and goes back on the queue.
-> Repair spreads only as far as the disagreement reaches._
->
-> _3. THE PAYOFF — after a change, D\* Lite re-expands only the affected region, not
-> the whole map. Code linked for anyone who wants the exact mechanics (g/rhs, the
-> two-part key, the km trick that lets the start move)._
+## D*: the first to reuse, and why it's hard
+
+The first algorithm to take reuse seriously was D\*, published by Anthony Stentz at Carnegie Mellon in 1994. The name stands for "Dynamic A\*," and the dynamism is the point: when the map changes, D\* doesn't restart. It takes the search it already has and repairs it, pushing the consequences of the change outward only as far as they actually reach.
+
+The idea it introduced, and the one that runs through everything that came after, is the inconsistent node. When an edge cost changes, say a cell that used to be cheap is now a rock, the nodes that depended on it are suddenly out of date: the cost they think it takes to reach the goal no longer matches reality. D\* puts those nodes back on its queue and works through them, fixing each one and waking its neighbours if they're affected too. The correction ripples outward until everything agrees again, and in practice it stops long before it has touched the whole map.
+
+That last part is what makes it work. The bookkeeping is what makes it hard. D\* tracks whether each node's cost is going up or down, states it calls RAISE and LOWER, and the rules for propagating a raised cost differ from the rules for a lowered one in ways that are genuinely fiddly. I've implemented it, and I'll say plainly that D\* is hard to reason about. Tracing why a given node gets re-expanded, and convincing yourself the whole thing stays correct, tends to mean keeping the original paper open in another tab the whole time.
+
+So D\* worked, and it flew, but it was thorny enough that people went looking for a cleaner way to express the same idea. They found one eight years later.
+
+---
+
+## D\* Lite: the same idea, made manageable
+
+D\* Lite, from Sven Koenig and Maxim Likhachev in 2002, reaches the same place as D\*, reuse the search, repair only what changed, but by a route that's much easier to hold in your head. It's the version worth actually understanding, so here's the intuition; the exact mechanics are in the code.
+
+The first idea is the one that makes the rest click, and it's a nice inversion: search backward, from the goal.
+
+Here's why that helps. The goal doesn't move; it's a fixed spot on the map. The thing that moves is the rover. So if you anchor the search at the goal and compute, for every cell, the cost to get from that cell to the goal, most of those numbers stay true wherever the rover goes. When it advances a few metres, or spots a rock off to one side, the cost-to-goal for the vast majority of the map is unchanged. Only a small patch near the disturbance needs fixing. Anchor the search at the thing that stays put, and you keep almost all of your work almost all of the time.
+
+The second idea is how D\* Lite knows which cells need fixing. Every cell carries two numbers. The first, g, is its last-known cost to the goal: what it currently believes. The second, rhs, is a one-step lookahead: the best its neighbours are offering right now. When the two match, the cell is settled and gets left alone. When they don't, when a cell's stored belief no longer matches what its neighbours actually offer, the cell is inconsistent and goes on the queue. That's the whole trigger. A new rock makes a few nearby cells disagree with themselves; D\* Lite fixes those, which may make their neighbours disagree, and the repair spreads outward exactly as far as the disagreement goes and no further.
+
+Run the same drive as before and the rover barely reacts to most rocks: a small local repair, and it's moving again, reusing the search it built at the start instead of rebuilding it.
 
 ![The same drive under D* Lite: it reuses its search and mostly barely reacts](images/dlite_drive.gif)
-<!-- Viz 2: D* Lite drive, same terrain/obstacles as Viz 1. Counter ends ~445 vs
-     A*'s ~618. Note: D* Lite replans MORE often but expands FEWER cells total. -->
 
-![Both running counters as the rover crosses the map: A* jumps hard at every replan and pulls away](images/replan_counter.png)
-<!-- Viz 2b: the two counters on one axis (A* 618 vs D* Lite 445). Makes the count
-     contrast unmissable without relying on the search-cloud shapes. -->
+The payoff depends on scale. On a small map the lead is modest, and for a single very large change D\* Lite can even do more work than a fresh search, since raising a lot of costs at once is the thing it handles worst. But every time A\* replans from scratch it pays for the whole remaining search, while D\* Lite only ever pays for the patch that changed. The bigger the map, the wider that gap.
 
-> _Intent: the payoff, quantified honestly. D* Lite's edge isn't dramatic on a
-> small map — but it compounds: the bigger the map, the more A* pays to re-search
-> from scratch every time, while D* Lite's reuse keeps its cost low. On real
-> kilometre-wide rover maps the gap is enormous. THIS is why it matters for Mars._
+![Total planning work vs map size: A* (replan from scratch) climbs steeply while D\* Lite stays low](images/replan_scaling.png)
 
-![Total planning work vs map size: A* (replan from scratch) climbs steeply; D* Lite stays low](images/replan_scaling.png)
-<!-- Viz 3: scaling chart. The quantitative core of the article. -->
+That's the shape that matters. On the toy grids in these animations the gap is a factor of a few. On the real thing — a traversability map spanning a kilometre of Martian ground, replanned again and again across a day's drive — the gap is the difference between a plan that's ready when the rover needs it and one that isn't. This is why an algorithm from 2002 is still the right tool for a computer from the 1990s: it spends the scarce resource, computation, only where the world actually surprised it.
 
 ---
 
 ## Still going the long way round
-<!-- SECTION 5 — limitation + teaser for Part 3 -->
-> _Intent: even with efficient replanning, the path is still built from
-> north/south/east/west steps — blocky right-angle staircases, driving more
-> distance than a real rover needs. Same crack Part 1 pointed at. That gap is what
-> the next algorithm closes: Field D\*, the any-angle planner that actually flew on
-> Mars._
 
-![The blocky, right-angled path D* Lite produces — more distance than needed](images/dlite_hero.png)
-<!-- Viz 3: final path still, echoing Part 1's hero, to motivate any-angle planning. -->
+D\* Lite fixes the problem we started with. The rover can now drive into terrain it's never seen, find out it was wrong about it, and adapt without grinding its slow brain to a halt. That's a real and useful thing to be able to do.
+
+But look at the route it produces.
+
+![The blocky, right-angled path D* Lite drives — more distance than needed](images/dlite_hero.png)
+
+It stair-steps. Every move is a right angle, north, south, east, west, because we're planning on a 4-connected grid: from any cell the rover may only step to the four it shares an edge with. You could let it take the four diagonal neighbours too, and we will in part three, but that only swaps right angles for 45° zig-zags; it still isn't the straight line the rover actually wants. It's the same blockiness we saw with A\* in part one, and it's still costing us. A real rover doesn't want to shuffle along in square steps; it wants to cut across open ground at whatever angle gets it there soonest. Every staircase corner is distance it didn't need to travel, and distance is time and battery it doesn't have to spare.
+
+We've taught the rover to replan efficiently. We haven't taught it to drive in a straight line. Closing the gap between the blocky grid path and the smooth route a rover actually wants is what the next generation of algorithms was built for, and it's the one that actually flew to Mars.
+
+Part 3 covers Field D\*: any-angle path planning, and the branch of this family that genuinely drove on the surface. The full implementation, modern tested C++ with the visualizer behind every image here, is on GitHub.
 
 ---
 
-<!-- CLOSING — mirror Part 1's italic teaser + GitHub link format -->
-> _Part 3 will cover Field D\*: any-angle paths, and the version that actually drove
-> on Mars. The full implementation — modern C++, tested, with the visualizer that
-> produced the images above — is on [GitHub](https://github.com/higim/space-path-planning/tree/main)._
->
-> _The images in this article were generated from real D\* Lite searches on
-> procedurally generated Mars-like terrain, using the visualizer built for this series._
+*Part 3 will cover **Field D\***: any-angle path planning, and the version of this family that genuinely drove on Mars. The full implementation is on [GitHub](https://github.com/higim/space-path-planning/tree/main).*
+
+*The animations in this article were generated from real A\* and D\* Lite searches on procedurally generated Mars-like terrain, using the visualizer built for this series.
