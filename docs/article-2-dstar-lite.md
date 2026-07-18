@@ -2,7 +2,7 @@
 
 ### Part 2. D\* and D\* Lite: replanning when the map won't hold still
 
-![Same drive, same obstacles: A\* re-explodes its search on every discovery (left), D\* Lite barely reacts (right)](images/hero_replan_compare.png)
+![Mid-drive, A\* hits a rock it didn't know about and re-explodes its whole search from scratch — the waste this article is about](images/hero_astar_replan.png)
 
 ---
 
@@ -72,7 +72,7 @@ The payoff depends on scale. On a small map the lead is modest, and for a single
 
 ![Total planning work vs map size: A* (replan from scratch) climbs steeply while D\* Lite stays low](images/replan_scaling.png)
 
-That's the shape that matters. On the toy grids in these animations the gap is a factor of a few. On the real thing — a traversability map spanning a kilometre of Martian ground, replanned again and again across a day's drive — the gap is the difference between a plan that's ready when the rover needs it and one that isn't. This is why an algorithm from 2002 is still the right tool for a computer from the 1990s: it spends the scarce resource, computation, only where the world actually surprised it.
+On these toy grids the gap is a factor of a few. On the real thing, a traversability map covering a kilometre of Martian ground, replanned over and over across a day's drive, that gap decides whether the next plan is ready in time or the rover sits waiting for it. Computation is the resource in short supply, and D* Lite spends it only where the terrain actually turned out to be different from the map. That's why a 2002 algorithm still earns its place on a chip built to 1990s tolerances.
 
 ---
 
